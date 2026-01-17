@@ -169,32 +169,46 @@ def get_chat_history(scan_id):
     try:
         user_id = request.args.get('user_id', type=int)
         
+        # Verify scan exists
+        scan = Scan.query.get(scan_id)
+        if not scan:
+            return jsonify({
+                'error': 'Scan not found',
+                'scan_id': scan_id
+            }), 404
+        
         # Get chat history for scan
         if user_id:
-            conversations = Conversation.query.filter_by(
-                scan_id=scan_id,
-                user_id=user_id
-            ).all()
+            conversations = Conversation.query.filter(
+                Conversation.scan_id == scan_id,
+                Conversation.user_id == user_id
+            ).order_by(Conversation.timestamp.asc()).all()
         else:
-            conversations = Conversation.query.filter_by(scan_id=scan_id).all()
+            conversations = Conversation.query.filter(
+                Conversation.scan_id == scan_id
+            ).order_by(Conversation.timestamp.asc()).all()
         
         if not conversations:
             return jsonify({
+                'scan_id': scan_id,
+                'user_id': user_id,
                 'message': 'No chat history found',
-                'history': [],
-                'scan_id': scan_id
+                'history': []
             }), 200
         
-        history = [{
-            'conversation_id': c.conversation_id,
-            'user_message': c.user_message,
-            'ai_response': c.ai_response,
-            'created_at': c.created_at.isoformat()
-        } for c in conversations]
+        history = []
+        for c in conversations:
+            history.append({
+                'conv_id': c.conv_id,
+                'role': c.role,
+                'message': c.message,
+                'timestamp': c.timestamp.isoformat()
+            })
         
         return jsonify({
             'scan_id': scan_id,
             'user_id': user_id,
+            'count': len(history),
             'history': history
         }), 200
         
